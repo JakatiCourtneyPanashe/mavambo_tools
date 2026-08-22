@@ -1,0 +1,22 @@
+{
+  "name": "pdf",
+  "description": "Read text out of PDF files. Give one or more paths and an optional page range; reports page counts and extracts the text.",
+  "entry": ["python", "handler.py"],
+  "dependencies": ["pypdf>=5.0"],
+  "timeout_seconds": 120,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "paths": {
+        "type": "array",
+        "items": {"type": "string", "minLength": 1},
+        "minItems": 1
+      },
+      "first_page": {"type": "integer", "minimum": 1},
+      "last_page": {"type": "integer", "minimum": 1},
+      "reason": {"type": "string", "minLength": 1}
+    },
+    "required": ["paths", "reason"],
+    "additionalProperties": false
+  }
+}
