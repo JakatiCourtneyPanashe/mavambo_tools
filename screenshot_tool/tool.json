@@ -1,0 +1,45 @@
+{
+  "name": "screenshot_tool",
+  "description": "Take a screenshot of the current desktop screen and save it as a PNG in C:\\Users\\sparr\\Desktop\\MAVAMBO_COMBINED\\coding_agent\\workspace_root\\man. Optionally capture a screen region and choose the output filename.",
+  "entry": [
+    "python",
+    "handler.py"
+  ],
+  "timeout_seconds": 30,
+  "dependencies": [
+    "mss>=10.0"
+  ],
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "filename": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "description": "PNG filename or relative path inside the project. Defaults to screenshot.png."
+      },
+      "left": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Optional left coordinate of the capture region."
+      },
+      "top": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Optional top coordinate of the capture region."
+      },
+      "width": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Optional capture width. Provide with left/top/height for a region."
+      },
+      "height": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Optional capture height. Provide with left/top/width for a region."
+      }
+    },
+    "required": [],
+    "additionalProperties": false
+  }
+}
