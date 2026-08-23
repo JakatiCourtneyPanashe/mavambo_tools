@@ -3,6 +3,7 @@
   "description": "Extract text from an image file (PNG, JPG, etc.) using OCR and return it as a string. Use this to read text that appears inside a picture or screenshot.",
   "entry": ["python", "handler.py"],
   "timeout_seconds": 120,
+  "dependencies": ["easyocr"],
   "parameters": {
     "type": "object",
     "properties": {
