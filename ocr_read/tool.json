@@ -19,8 +19,7 @@
       },
       "detail": {
         "type": "boolean",
-        "description": "If true, also return each detected text box with its bounding box and confidence. Defaults to false (plain text only).",
-        "default": false
+        "description": "If true, also return each detected text box with its bounding box and confidence. Defaults to false (plain text only)."
       }
     },
     "required": ["path"],
