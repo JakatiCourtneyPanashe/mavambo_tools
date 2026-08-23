@@ -1,94 +1,96 @@
 #!/usr/bin/env python3
-"""OCR tool handler.
+"""OCR tool handler for Mavambo.
 
-Contract:
-  - Reads a single JSON object of arguments from stdin (falls back to argv[1]).
-  - Arguments validate against the "parameters" schema in tool.json.
-  - On success prints ONE JSON object to stdout and exits 0:
-        {"ok": true, "text": "...", "boxes": [...]}   # boxes only if detail=true
-  - On failure prints {"ok": false, "error": "..."} to stdout and exits 1.
-
-Only stdout carries the JSON result. The OCR engine's own progress chatter is
-forced to stderr so it never corrupts the JSON on stdout.
+Mavambo contract:
+  - stdin carries ONE JSON envelope: {"tool", "arguments": {...}, "cwd": "..."}
+  - stdout must carry ONE JSON object AND the process must exit 0:
+        {"result": <value>}   on success
+        {"error":  "<why>"}   on failure   (never signal failure with exit code)
+  Mavambo reads the exit code first; any nonzero exit is reported as a crash and
+  stdout is never parsed. Failures are the "error" key, not sys.exit(1).
 """
 
 import sys
 import os
 import json
+import pathlib
 
 
-def read_args():
-    """Load the arguments object from stdin, or argv[1] as a fallback."""
-    raw = ""
-    if not sys.stdin.isatty():
-        raw = sys.stdin.read()
-    if not raw.strip() and len(sys.argv) > 1:
-        raw = sys.argv[1]
-    if not raw.strip():
-        return {}
-    args = json.loads(raw)
-    if not isinstance(args, dict):
-        raise ValueError("arguments must be a JSON object")
-    return args
+def fail(message):
+    json.dump({"error": message}, sys.stdout)
+    raise SystemExit(0)          # exit 0: the error travels in the JSON
+
+
+def resolve(root, name):
+    """A path inside the project, or None (rejects .. and absolute paths)."""
+    candidate = pathlib.Path(name)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        return None
+    try:
+        target = (root / candidate).resolve()
+    except OSError:
+        return None
+    if root != target and root not in target.parents:
+        return None
+    return target
 
 
 def main():
     try:
-        args = read_args()
+        envelope = json.load(sys.stdin)
     except Exception as e:
-        print(json.dumps({"ok": False, "error": f"invalid arguments: {e}"}))
-        return 1
+        fail(f"could not read arguments: {e}")
 
-    path = args.get("path")
+    arguments = envelope.get("arguments") or {}
+    root = pathlib.Path(envelope.get("cwd") or ".").resolve()
+
+    path = arguments.get("path")
     if not path:
-        print(json.dumps({"ok": False, "error": "'path' is required"}))
-        return 1
-    if not os.path.isfile(path):
-        print(json.dumps({"ok": False, "error": f"file not found: {path}"}))
-        return 1
+        fail("'path' is required")
+    target = resolve(root, path)
+    if target is None:
+        fail(f"refused: '{path}' is outside the project folder")
+    if not target.is_file():
+        fail(f"file not found: {path}")
 
-    languages = args.get("languages") or ["en"]
-    detail = bool(args.get("detail", False))
+    languages = arguments.get("languages") or ["en"]
+    detail = bool(arguments.get("detail", False))
 
     try:
         import easyocr
     except ImportError:
-        print(json.dumps({
-            "ok": False,
-            "error": "the 'easyocr' package is required (pip install easyocr)",
-        }))
-        return 1
+        fail("the 'easyocr' package is required; declare it in tool.json "
+             "dependencies and run '--mav tools sync'")
 
+    # easyocr writes progress to stdout; point stdout at stderr during the noisy
+    # calls so it cannot corrupt the one JSON object stdout owes Mavambo.
+    real_stdout = sys.stdout
+    sys.stdout = sys.stderr
     try:
-        # easyocr prints model-download/progress lines; keep stdout clean by
-        # temporarily pointing stdout at stderr during the noisy calls.
-        real_stdout = sys.stdout
-        sys.stdout = sys.stderr
-        try:
-            reader = easyocr.Reader(languages, gpu=False, verbose=False)
-            results = reader.readtext(path, detail=1)
-        finally:
-            sys.stdout = real_stdout
-
-        lines = [str(r[1]) for r in results]
-        out = {"ok": True, "text": "\n".join(lines)}
-
-        if detail:
-            out["boxes"] = [
-                {
-                    "text": str(r[1]),
-                    "confidence": round(float(r[2]), 4),
-                    "bbox": [[int(x), int(y)] for (x, y) in r[0]],
-                }
-                for r in results
-            ]
-
-        print(json.dumps(out, ensure_ascii=False))
-        return 0
+        reader = easyocr.Reader(languages, gpu=False, verbose=False)
+        results = reader.readtext(str(target), detail=1)
     except Exception as e:
-        print(json.dumps({"ok": False, "error": str(e)}))
-        return 1
+        sys.stdout = real_stdout
+        fail(f"OCR failed: {e}")
+    finally:
+        sys.stdout = real_stdout
+
+    text = "\n".join(str(r[1]) for r in results)
+    if detail:
+        result = {
+            "text": text,
+            "boxes": [
+                {"text": str(r[1]),
+                 "confidence": round(float(r[2]), 4),
+                 "bbox": [[int(x), int(y)] for (x, y) in r[0]]}
+                for r in results
+            ],
+        }
+    else:
+        result = text
+
+    json.dump({"result": result}, sys.stdout, ensure_ascii=False)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
