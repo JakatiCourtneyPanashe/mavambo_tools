@@ -1,0 +1,29 @@
+{
+  "name": "ocr_read",
+  "description": "Extract text from an image file (PNG, JPG, etc.) using OCR and return it as a string. Use this to read text that appears inside a picture or screenshot.",
+  "entry": ["python", "handler.py"],
+  "timeout_seconds": 120,
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "Path to the image file to read text from.",
+        "minLength": 1
+      },
+      "languages": {
+        "type": "array",
+        "description": "Language codes to recognize, e.g. [\"en\"] or [\"en\",\"fr\"]. Defaults to [\"en\"].",
+        "items": { "type": "string", "minLength": 2 },
+        "minItems": 1
+      },
+      "detail": {
+        "type": "boolean",
+        "description": "If true, also return each detected text box with its bounding box and confidence. Defaults to false (plain text only).",
+        "default": false
+      }
+    },
+    "required": ["path"],
+    "additionalProperties": false
+  }
+}
